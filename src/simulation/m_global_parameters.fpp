@@ -375,16 +375,18 @@ module m_global_parameters
 
     !> @name Immersed Boundaries
     !> @{
-    logical                                                  :: ib
-    integer                                                  :: num_ibs
-    integer                                                  :: collision_model
-    real(wp)                                                 :: coefficient_of_restitution
-    real(wp)                                                 :: collision_time
-    real(wp)                                                 :: ib_coefficient_of_friction
-    logical                                                  :: ib_state_wrt
-    type(ib_patch_parameters), dimension(num_ib_patches_max) :: patch_ib  !< Immersed boundary patch parameters
-    type(vec3_dt), allocatable, dimension(:)                 :: airfoil_grid_u, airfoil_grid_l
-    integer                                                  :: Np
+    logical                                                             :: ib
+    integer                                                             :: num_ibs
+    integer                                                             :: collision_model
+    integer                                                             :: num_particle_clouds
+    real(wp)                                                            :: coefficient_of_restitution
+    real(wp)                                                            :: collision_time
+    real(wp)                                                            :: ib_coefficient_of_friction
+    logical                                                             :: ib_state_wrt
+    type(ib_patch_parameters), dimension(num_ib_patches_max)            :: patch_ib        !< Immersed boundary patch parameters
+    type(particle_cloud_parameters), dimension(num_particle_clouds_max) :: particle_cloud  !< Particle bed specifications
+    type(vec3_dt), allocatable, dimension(:)                            :: airfoil_grid_u, airfoil_grid_l
+    integer                                                             :: Np
 
     $:GPU_DECLARE(create='[ib, num_ibs, patch_ib, Np, airfoil_grid_u, airfoil_grid_l]')
     $:GPU_DECLARE(create='[ib_coefficient_of_friction]')
@@ -856,6 +858,21 @@ contains
         lag_params%subcycle_collisions = .false.
         lag_params%qs_fluct_force = .false.
         lag_params%N_collision_subcycles = dflt_int
+        lag_params%packing_flag = 0
+        lag_params%packing_size_distribution = 0
+        lag_params%packing_seed = 1
+        lag_params%packing_max_attempts = 1000
+        lag_params%packing_volume_fraction = dflt_real
+        lag_params%packing_diameter_min = dflt_real
+        lag_params%packing_diameter_max = dflt_real
+        lag_params%packing_diameter_mean = dflt_real
+        lag_params%packing_diameter_std = dflt_real
+        lag_params%packing_min_spacing = 0._wp
+        lag_params%packing_centroid(:) = 0._wp
+        lag_params%packing_length(:) = dflt_real
+        lag_params%packing_velocity(:) = 0._wp
+        lag_params%packing_shell_inner_radius = dflt_real
+        lag_params%packing_shell_outer_radius = dflt_real
         lag_params%mu_ref(:) = dflt_real
         lag_params%suth(:) = 0._wp
 
@@ -882,8 +899,28 @@ contains
             relativity = .false.
         #:endif
 
+        num_particle_clouds = 0
+        do i = 1, num_particle_clouds_max
+            particle_cloud(i)%x_centroid = 0._wp
+            particle_cloud(i)%y_centroid = 0._wp
+            particle_cloud(i)%z_centroid = 0._wp
+            particle_cloud(i)%length_x = dflt_real
+            particle_cloud(i)%length_y = dflt_real
+            particle_cloud(i)%length_z = dflt_real
+            particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%radius = dflt_real
+            particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
+            particle_cloud(i)%moving_ibm = 0
+            particle_cloud(i)%seed = 0
+            particle_cloud(i)%packing_method = dflt_int
+        end do
+
         do i = 1, num_ib_patches_max
             patch_ib(i)%geometry = dflt_int
+            patch_ib(i)%gbl_patch_id = i
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp
             patch_ib(i)%z_centroid = 0._wp

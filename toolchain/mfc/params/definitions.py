@@ -1318,11 +1318,38 @@ def _load():
     _r("lag_params%input_path", STR, {"bubbles"})
 
     # --- lag_params (Lagrangian particles) ---
-    for a in ["nParticles_glb", "stokes_drag", "qs_drag_model", "added_mass_model", "interpolation_order", "N_collision_subcycles"]:
+    for a in [
+        "nParticles_glb",
+        "stokes_drag",
+        "qs_drag_model",
+        "added_mass_model",
+        "interpolation_order",
+        "N_collision_subcycles",
+        "packing_flag",
+        "packing_size_distribution",
+        "packing_seed",
+        "packing_max_attempts",
+    ]:
         _r(f"lag_params%{a}", INT, {"particles"})
 
     for a in ["collision_force", "qs_fluct_force", "subcycle_collisions"]:
         _r(f"lag_params%{a}", LOG, {"particles"})
+
+    for a in [
+        "packing_volume_fraction",
+        "packing_diameter_min",
+        "packing_diameter_max",
+        "packing_diameter_mean",
+        "packing_diameter_std",
+        "packing_min_spacing",
+        "packing_shell_inner_radius",
+        "packing_shell_outer_radius",
+    ]:
+        _r(f"lag_params%{a}", REAL, {"particles"})
+
+    for j in range(1, 4):
+        for a in ["packing_centroid", "packing_length", "packing_velocity"]:
+            _r(f"lag_params%{a}({j})", REAL, {"particles"})
 
     for f in range(1, NF + 1):
         for a in ["mu_ref", "suth"]:

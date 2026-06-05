@@ -291,6 +291,7 @@ module m_derived_types
     type ib_patch_parameters
 
         integer :: geometry  !< Type of geometry for the patch
+        integer :: gbl_patch_id
 
         !> Location of the geometric center, i.e. the centroid, of the patch. It is specified through its x-, y- and z-coordinates,
         !! respectively.
@@ -324,6 +325,20 @@ module m_derived_types
         real(wp), dimension(1:3) :: angular_vel
         real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
     end type ib_patch_parameters
+
+    type particle_cloud_parameters
+        real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
+        real(wp) :: length_x, length_y, length_z        !< Dimensions of the particle bed region
+        integer  :: num_particles                       !< Number of particles to generate
+        real(wp) :: radius                              !< Particle radius
+        real(wp) :: mass                                !< Particle mass
+        real(wp) :: min_spacing                         !< Minimum surface-to-surface gap
+        real(wp) :: shell_inner_radius                  !< Inner radius for hemisphere-shell packing
+        real(wp) :: shell_outer_radius                  !< Outer radius for hemisphere-shell packing
+        integer  :: moving_ibm                          !< Motion flag
+        integer  :: seed                                !< Random seed for reproducible placement
+        integer  :: packing_method                      !< Packing algorithm: 1=rejection sampling, 2=lattice, 3=hemisphere shell
+    end type particle_cloud_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
@@ -485,6 +500,21 @@ module m_derived_types
         integer                             :: N_collision_subcycles  !< Number of subcycles for collisions if subcycling
         logical                             :: qs_fluct_force  !< QS Fluctuations
         character(LEN=pathlen_max)          :: input_path  !< Path to lag_bubbles.dat
+        integer                             :: packing_flag  !< 0: read input_path, 1: pack box, 2: pack hemisphere shell
+        integer                             :: packing_size_distribution  !< 0: constant, 1: uniform, 2: Gaussian
+        integer                             :: packing_seed  !< Random seed for deterministic packing
+        integer                             :: packing_max_attempts  !< Maximum placement attempts per particle
+        real(wp)                            :: packing_volume_fraction  !< Target packing volume fraction
+        real(wp)                            :: packing_diameter_min  !< Minimum packed particle diameter
+        real(wp)                            :: packing_diameter_max  !< Maximum packed particle diameter
+        real(wp)                            :: packing_diameter_mean  !< Mean or constant packed particle diameter
+        real(wp)                            :: packing_diameter_std  !< Gaussian standard deviation of packed particle diameter
+        real(wp)                            :: packing_min_spacing  !< Minimum surface-to-surface particle spacing
+        real(wp), dimension(3)              :: packing_centroid  !< Packing region centroid
+        real(wp), dimension(3)              :: packing_length  !< Box bounds for packing and shell clipping
+        real(wp), dimension(3)              :: packing_velocity  !< Initial velocity for packed particles
+        real(wp)                            :: packing_shell_inner_radius  !< Inner radius for shell packing
+        real(wp)                            :: packing_shell_outer_radius  !< Outer radius for shell packing
         integer                             :: charNz  !< Number of grid cells in characteristic depth
         real(wp), dimension(num_fluids_max) :: mu_ref  !< Reference Viscosity for particle drag
         real(wp), dimension(num_fluids_max) :: suth  !< Sutherland parameter
