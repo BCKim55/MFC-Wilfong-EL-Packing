@@ -2131,21 +2131,21 @@ contains
         else if (dir == 2) then
             $:GPU_PARALLEL_LOOP(private='[i, j, k, mydx]', collapse=3,copyin='[dir, field_var]')
             do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(1)%beg, idwbuff(1)%end
-                    do i = idwbuff(2)%beg, idwbuff(2)%end
-                        mydx = dy(i)
-                        dq(j, i, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        mydx = dy(j)
+                        dq(i, j, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         else if (dir == 3) then
             $:GPU_PARALLEL_LOOP(private='[i, j, k, mydx]', collapse=3,copyin='[dir, field_var]')
-            do k = idwbuff(1)%beg, idwbuff(1)%end
+            do k = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(3)%beg, idwbuff(3)%end
-                        mydx = dz(i)
-                        dq(k, j, i) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        mydx = dz(k)
+                        dq(i, j, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
                     end do
                 end do
             end do

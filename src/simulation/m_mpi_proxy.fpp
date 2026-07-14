@@ -107,15 +107,20 @@ contains
     !! @param lag_num_ts Number of stages in time-stepping scheme
     subroutine s_initialize_solid_particles_mpi(lag_num_ts)
 
-        integer :: i, j, k
-        integer :: real_size, int_size, nReal, lag_num_ts
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
+        integer         :: i, j, k
+        integer         :: real_size, int_size, nReal, lag_num_ts
+        integer(kind=8) :: p_var_size_8
+        integer         :: ierr  !< Generic flag used to identify and report MPI errors
 
 #ifdef MFC_MPI
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
         nReal = 10 + 13*2 + 7*lag_num_ts
-        p_var_size = (nReal*real_size + 2*int_size)
+        p_var_size_8 = int(nReal, 8)*int(real_size, 8) + 2_8*int(int_size, 8)
+        if (p_var_size_8 > int(huge(p_var_size), 8)) then
+            call s_mpi_abort('Solid-particle MPI packed variable size exceeds 32-bit MPI count limit')
+        end if
+        p_var_size = int(p_var_size_8)
         p_buff_size = 1
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, &
@@ -1023,6 +1028,7 @@ contains
         integer :: i, j, k, l, q, r
         integer :: req_send, req_recv, ierr  !< Generic flag used to identify and report MPI errors
         integer :: send_count, send_offset, recv_count, recv_offset, send_size, total_send_size, total_recv_size
+        integer(kind=8) :: send_size_8, recv_size_8, total_send_size_8, total_recv_size_8, required_buff_size_8
         character(len=256) :: mpi_dbg_msg
 
 #ifdef MFC_MPI
@@ -1064,18 +1070,27 @@ contains
             call MPI_Waitall(send_count, send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
         end if
 
-        total_send_size = 0
-        total_recv_size = 0
+        total_send_size_8 = 0_8
+        total_recv_size_8 = 0_8
         do l = 1, n_neighbors
             i = neighbor_list(l, 1)
             j = neighbor_list(l, 2)
             k = neighbor_list(l, 3)
-            total_send_size = total_send_size + p_send_counts(i, j, k)*p_var_size
-            total_recv_size = total_recv_size + p_recv_counts(i, j, k)*p_var_size
+            total_send_size_8 = total_send_size_8 + int(p_send_counts(i, j, k), 8)*int(p_var_size, 8)
+            total_recv_size_8 = total_recv_size_8 + int(p_recv_counts(i, j, k), 8)*int(p_var_size, 8)
         end do
 
+        required_buff_size_8 = max(1_8, max(total_send_size_8, total_recv_size_8))
+        if (required_buff_size_8 > int(huge(p_buff_size), 8)) then
+            write (mpi_dbg_msg, '(a,i0,a,i0,a,i0)') 'Solid-particle MPI buffer exceeds 32-bit MPI count limit on rank ', &
+                   & proc_rank, ': send_size=', total_send_size_8, ', recv_size=', total_recv_size_8
+            call s_mpi_abort(trim(mpi_dbg_msg))
+        end if
+        total_send_size = int(total_send_size_8)
+        total_recv_size = int(total_recv_size_8)
+
         if (max(total_send_size, total_recv_size) > p_buff_size) then
-            p_buff_size = max(1, max(total_send_size, total_recv_size))
+            p_buff_size = int(required_buff_size_8)
             @:DEALLOCATE(p_send_buff, p_recv_buff)
             @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         end if
@@ -1093,9 +1108,15 @@ contains
 
             if (p_recv_counts(i, j, k) > 0) then
                 partner = neighbor_ranks(i, j, k)
-                p_recv_size = p_recv_counts(i, j, k)*p_var_size
+                recv_size_8 = int(p_recv_counts(i, j, k), 8)*int(p_var_size, 8)
+                if (recv_size_8 > int(huge(p_recv_size), 8)) then
+                    write (mpi_dbg_msg, '(a,i0,a,i0)') 'Solid-particle recv size exceeds 32-bit MPI count limit on rank ', &
+                           & proc_rank, ': size=', recv_size_8
+                    call s_mpi_abort(trim(mpi_dbg_msg))
+                end if
+                p_recv_size = int(recv_size_8)
                 recv_tag = neighbor_tag(i, j, k)
-                if (recv_offset + p_recv_size - 1 > p_buff_size) then
+                if (int(recv_offset, 8) + recv_size_8 - 1_8 > int(p_buff_size, 8)) then
                     write (mpi_dbg_msg, '(a,i0,a,i0,a,i0,a,i0,a,i0)') 'Solid-particle recv buffer overflow on rank ', proc_rank, &
                            & ': offset=', recv_offset, ', size=', p_recv_size, ', p_buff_size=', p_buff_size
                     call s_mpi_abort(trim(mpi_dbg_msg))
@@ -1119,8 +1140,14 @@ contains
             if (p_send_counts(i, j, k) > 0 .and. abs(i) + abs(j) + abs(k) /= 0 .and. abs(i) + abs(j) + abs(k) /= 0) then
                 partner = neighbor_ranks(i, j, k)
                 send_tag = neighbor_tag(-i, -j, -k)
-                send_size = p_send_counts(i, j, k)*p_var_size
-                if (send_offset + send_size - 1 > p_buff_size) then
+                send_size_8 = int(p_send_counts(i, j, k), 8)*int(p_var_size, 8)
+                if (send_size_8 > int(huge(send_size), 8)) then
+                    write (mpi_dbg_msg, '(a,i0,a,i0)') 'Solid-particle send size exceeds 32-bit MPI count limit on rank ', &
+                           & proc_rank, ': size=', send_size_8
+                    call s_mpi_abort(trim(mpi_dbg_msg))
+                end if
+                send_size = int(send_size_8)
+                if (int(send_offset, 8) + send_size_8 - 1_8 > int(p_buff_size, 8)) then
                     write (mpi_dbg_msg, '(a,i0,a,i0,a,i0,a,i0,a,i0)') 'Solid-particle send buffer overflow on rank ', proc_rank, &
                            & ': offset=', send_offset, ', size=', send_size, ', p_buff_size=', p_buff_size
                     call s_mpi_abort(trim(mpi_dbg_msg))
@@ -1196,7 +1223,13 @@ contains
             k = neighbor_list(l, 3)
 
             if (p_recv_counts(i, j, k) > 0 .and. abs(i) + abs(j) + abs(k) /= 0) then
-                p_recv_size = p_recv_counts(i, j, k)*p_var_size
+                recv_size_8 = int(p_recv_counts(i, j, k), 8)*int(p_var_size, 8)
+                if (recv_size_8 > int(huge(p_recv_size), 8)) then
+                    write (mpi_dbg_msg, '(a,i0,a,i0)') 'Solid-particle unpack size exceeds 32-bit MPI count limit on rank ', &
+                           & proc_rank, ': size=', recv_size_8
+                    call s_mpi_abort(trim(mpi_dbg_msg))
+                end if
+                p_recv_size = int(recv_size_8)
                 recv_offset = recv_offsets(l)
 
                 position = 0
