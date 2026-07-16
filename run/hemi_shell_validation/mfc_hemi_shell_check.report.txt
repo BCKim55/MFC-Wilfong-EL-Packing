@@ -1,0 +1,12 @@
+n_particles: 40640
+radius_min: 2.5e-05
+radius_max: 2.5e-05
+radial_min: 0.006025014581205413
+radial_max: 0.006974956404135952
+inner_clearance_min: 1.4581205413227716e-08
+outer_clearance_min: 4.359586404797269e-08
+plane_clearance_min: 1.5540840000000022e-07
+min_pair_distance: 5.0004808781927076e-05
+min_allowed_distance: 5e-05
+min_pair: (31073, 34702)
+failures: {'inner_boundary': 0, 'outer_boundary': 0, 'hemisphere_plane': 0, 'overlap': 0}
