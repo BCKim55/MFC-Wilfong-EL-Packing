@@ -482,7 +482,7 @@ contains
     !! called from GPU routines/functions
     function f_model_random_number(seed) result(rval)
 
-        ! $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(function_name='f_model_random_number', parallelism='[seq]', cray_inline=True)
 
         integer, intent(inout) :: seed
         real(wp)               :: rval

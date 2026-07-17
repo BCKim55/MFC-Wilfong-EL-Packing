@@ -41,6 +41,16 @@ module m_particles_EL_kernels
 
 contains
 
+    logical function f_is_finite_gpu(val) result(is_finite)
+
+        $:GPU_ROUTINE(function_name='f_is_finite_gpu', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: val
+
+        is_finite = val == val .and. abs(val) <= huge(val)
+
+    end function f_is_finite_gpu
+
     !> The purpose of this subroutine is to initialize constants for use in the particle kernels
     subroutine s_initialize_particle_kernels()
 
@@ -250,6 +260,8 @@ contains
     end subroutine s_gaussian_atomic
 
     subroutine s_applygaussian_aniso(center, cellaux, nodecoord, func)
+
+        $:GPU_ROUTINE(function_name='s_applygaussian_aniso',parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in)  :: cellaux
@@ -638,7 +650,7 @@ contains
             fam = Cam*vol*(-v_rel*SDrho + rhoDuDt + fluid_vel*(vrel_gradrho))
 
             do dir = 1, num_dims
-                if (.not. ieee_is_finite(fam(dir))) then
+                if (.not. f_is_finite_gpu(fam(dir))) then
                     fam(dir) = 0._wp
                     rmass_add = 0._wp
                 end if
@@ -660,7 +672,7 @@ contains
         end if
 
         do dir = 1, num_dims
-            if (.not. ieee_is_finite(force(dir))) then
+            if (.not. f_is_finite_gpu(force(dir))) then
                 force(dir) = 0._wp
             end if
         end do
@@ -699,8 +711,8 @@ contains
         real(wp), dimension(5)              :: UnifRnd
         integer                             :: i
 
-        if (.not. ieee_is_finite(fqs_fluct_old(1)) .or. .not. ieee_is_finite(fqs_fluct_old(2)) &
-            & .or. .not. ieee_is_finite(fqs_fluct_old(3))) then
+        if (.not. f_is_finite_gpu(fqs_fluct_old(1)) .or. .not. f_is_finite_gpu(fqs_fluct_old(2)) &
+            & .or. .not. f_is_finite_gpu(fqs_fluct_old(3))) then
             fqs_fluct_new = 0._wp
             return
         end if
