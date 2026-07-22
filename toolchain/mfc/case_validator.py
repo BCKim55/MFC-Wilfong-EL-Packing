@@ -631,11 +631,11 @@ class CaseValidator:
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
             self.prohibit(
                 packing_method is None,
-                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
+                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice, 3 = hemisphere shell)",
             )
             self.prohibit(
-                packing_method is not None and packing_method not in [1, 2],
-                f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
+                packing_method is not None and packing_method not in [1, 2, 3],
+                f"particle_cloud({i})%packing_method must be 1 (rejection sampling), 2 (lattice), or 3 (hemisphere shell)",
             )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
