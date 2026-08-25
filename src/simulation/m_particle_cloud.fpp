@@ -67,11 +67,12 @@ contains
         integer                                                :: n_placed, geom, seed
         integer(8)                                             :: n_attempts, max_attempts
         real(wp)                                               :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                               :: rx, ry, rz, dist
-        logical                                                :: overlaps
+        real(wp)                                               :: rx, ry, rz, dist_sq, dx, dy, dz
+        real(wp)                                               :: length_x, length_y, length_z, min_dist_sq
+        logical                                                :: overlaps, periodic_pack
         real(wp), allocatable                                  :: placed(:,:)
         integer                                                :: hash_size, slot
-        integer                                                :: bx, by, bz, nbx, nby, nbz
+        integer                                                :: bx, by, bz, nbx, nby, nbz, nx_bins, ny_bins, nz_bins
         integer                                                :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
         integer, allocatable                                   :: hash_head(:), chain_next(:)
 
@@ -83,6 +84,15 @@ contains
         zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
 
         min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
+        min_dist_sq = min_dist**2
+        periodic_pack = particle_cloud(cloud_idx)%periodic == 1
+        length_x = particle_cloud(cloud_idx)%length_x
+        length_y = particle_cloud(cloud_idx)%length_y
+        length_z = particle_cloud(cloud_idx)%length_z
+        nx_bins = max(1, ceiling(length_x/min_dist))
+        ny_bins = max(1, ceiling(length_y/min_dist))
+        nz_bins = max(1, ceiling(length_z/min_dist))
+        if (p == 0) nz_bins = 1
 
         if (p == 0) then
             geom = 2  ! circle for 2D
@@ -121,10 +131,17 @@ contains
                 rz = zmin + f_xorshift(seed)*(zmax - zmin)
             end if
 
-            bx = int(floor(rx/min_dist))
-            by = int(floor(ry/min_dist))
-            bz = 0
-            if (p /= 0) bz = int(floor(rz/min_dist))
+            if (periodic_pack) then
+                bx = modulo(int(floor((rx - xmin)/min_dist)), nx_bins)
+                by = modulo(int(floor((ry - ymin)/min_dist)), ny_bins)
+                bz = 0
+                if (p /= 0) bz = modulo(int(floor((rz - zmin)/min_dist)), nz_bins)
+            else
+                bx = int(floor(rx/min_dist))
+                by = int(floor(ry/min_dist))
+                bz = 0
+                if (p /= 0) bz = int(floor(rz/min_dist))
+            end if
 
             ! Check 3x3(x3) neighboring bins - O(1) average via hash lookup
             overlaps = .false.
@@ -134,15 +151,28 @@ contains
                         nbx = bx + dx_b
                         nby = by + dy_b
                         nbz = bz + dz_b
+                        if (periodic_pack) then
+                            nbx = modulo(nbx, nx_bins)
+                            nby = modulo(nby, ny_bins)
+                            if (p /= 0) nbz = modulo(nbz, nz_bins)
+                        end if
                         slot = f_bin_hash(nbx, nby, nbz, hash_size)
                         j = hash_head(slot)
                         do while (j > 0)
-                            if (p == 0) then
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2)
-                            else
-                                dist = sqrt((rx - placed(1, j))**2 + (ry - placed(2, j))**2 + (rz - placed(3, j))**2)
+                            dx = abs(rx - placed(1, j))
+                            dy = abs(ry - placed(2, j))
+                            if (periodic_pack) then
+                                dx = min(dx, length_x - dx)
+                                dy = min(dy, length_y - dy)
                             end if
-                            if (dist < min_dist) then
+                            if (p == 0) then
+                                dist_sq = dx**2 + dy**2
+                            else
+                                dz = abs(rz - placed(3, j))
+                                if (periodic_pack) dz = min(dz, length_z - dz)
+                                dist_sq = dx**2 + dy**2 + dz**2
+                            end if
+                            if (dist_sq < min_dist_sq) then
                                 overlaps = .true.
                                 exit outer
                             end if

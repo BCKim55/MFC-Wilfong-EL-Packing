@@ -376,6 +376,7 @@ module m_derived_types
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
         integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice, 3=hemisphere shell
+        integer  :: periodic  !< Periodic overlap flag for random box packing: 0=off, 1=on
     end type particle_cloud_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid

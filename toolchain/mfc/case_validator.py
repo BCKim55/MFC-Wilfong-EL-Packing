@@ -628,6 +628,7 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
 
         for i in range(1, num_particle_clouds + 1):
+            p = self.get("p", 0)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
             self.prohibit(
                 packing_method is None,
@@ -636,6 +637,32 @@ class CaseValidator:
             self.prohibit(
                 packing_method is not None and packing_method not in [1, 2, 3],
                 f"particle_cloud({i})%packing_method must be 1 (rejection sampling), 2 (lattice), or 3 (hemisphere shell)",
+            )
+            periodic = self.get(f"particle_cloud({i})%periodic", 0)
+            length_x = self.get(f"particle_cloud({i})%length_x", None)
+            length_y = self.get(f"particle_cloud({i})%length_y", None)
+            length_z = self.get(f"particle_cloud({i})%length_z", None)
+
+            self.prohibit(
+                periodic not in [0, 1],
+                f"particle_cloud({i})%periodic must be 0 (off) or 1 (on)",
+            )
+            self.prohibit(
+                periodic == 1 and packing_method != 1,
+                f"particle_cloud({i})%periodic is only supported for random box packing",
+            )
+            self.prohibit(
+                periodic == 1
+                and (
+                    length_x is None
+                    or not self._is_numeric(length_x)
+                    or length_x <= 0
+                    or length_y is None
+                    or not self._is_numeric(length_y)
+                    or length_y <= 0
+                    or (p > 0 and (length_z is None or not self._is_numeric(length_z) or length_z <= 0))
+                ),
+                f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
             )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
